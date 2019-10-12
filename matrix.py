@@ -1,13 +1,87 @@
-#!/usr/local/anaconda3/envs/experiments/bin/python3
 import numpy
 import random
+import pickle
+import copy
+
+class Utils():
+    def __init__(self):
+        super(Utils, self).__init__()
+
+    def mutation_curve(self,x):
+        return x
+
+    def breed(self, agent1, agent2, inputs, outputs, binary, hidden, n):
+
+        if agent2.genome.shape[0] > agent1.genome.shape[0]:
+            g_diff_size = agent2.genome.shape[0]-agent1.genome.shape[0]
+            agent1.add_node(g_diff_size)
+
+        elif agent1.genome.shape[0] > agent2.genome.shape[0]:
+            g_diff_size = agent1.genome.shape[0]-agent2.genome.shape[0]
+            agent2.add_node(g_diff_size)
+
+        genome1 = agent1.genome
+        genome2 = agent2.genome
+
+        mask1 = ((numpy.random.random((agent1.size, agent1.size)) > n)*2.0)-1
+        mask2 = mask1 * -1.0
+        mask1 = (mask1 > 0.0)*1.0
+        mask2 = (mask2 > 0.0)*1.0
+
+        genome1 = genome1 * mask1
+        genome2 = genome2 * mask2
+        new_genome = genome1+genome2
+
+        new_agent = copy.copy(agent1)
+        new_agent.fitness = 0
+        new_agent.lines_cleared = 0
+
+        new_agent.genome = new_genome
+        return new_agent
+
+    def speciate(self, agents, best, num_species, inputs, outputs, bin, hidden, n_agents):
+
+        new_agents = agents
+        i = 0
+        while len(new_agents) < n_agents:
+
+            baby = self.breed(best, agents[-2], inputs, outputs, bin, hidden, i/n_agents-1)
+            #baby = copy.copy(agents[-1])
+            baby.fitness = 0
+
+            if numpy.random.random() > 0.8:
+                if numpy.random.random() > 0.5:
+                    baby.add_gene(self.mutation_curve(i))
+                else:
+                    baby.add_node(1)
+            else:
+                baby.mutate_gene(self.mutation_curve(i))
+            i+=1
+            num_species+=1
+
+            baby.id = num_species
+            new_agents.append(baby)
+
+        return new_agents, num_species
+
+    def export_genome(self, net):
+        filehandler = open('Agent{}.obj'.format(net.id), 'wb')
+        pickle.dump(net, filehandler)
+        print("Saved agent as Agent{}.obj".format(net.id))
+
+    def import_genome(self, filename):
+        print("Loading {}...".format(filename))
+        filehandler = open(filename, 'rb')
+        net = pickle.load(filehandler)
+        return net
 
 class Network():
-    def __init__(self, inputs, outputs, binary):
+    def __init__(self, inputs, outputs, binary, id):
         super(Network, self).__init__()
         self.inputs = inputs
         self.outputs = outputs
-
+        self.lines_cleared = 0
+        self.render = False
         mat_size = inputs+outputs
         self.size = mat_size
         self.genome = numpy.zeros((mat_size, mat_size))
@@ -17,8 +91,16 @@ class Network():
         self.fitness = 0.0
         self.connections = 0
         self.binary = binary
-        self.neuron_decay = 0.9
+        self.neuron_decay = 0.5
         self.recurrent_decay = 0.0
+        self.id = id
+
+    def set_score(self, score):
+        if self.fitness == 0:
+            self.fitness = score
+        else:
+            if score > self.fitness:
+                self.fitness = score
 
     def get_genome(self):
         genome = self.genome.flatten()
@@ -88,7 +170,7 @@ class Network():
             #    print(self.genome[i][-2:])
 
         out = self.nodes[-self.outputs:]
-        return self.activation(out)
+        return self.sigmoid(out)
 
     def add_node(self, x):
         for _ in range(x):
@@ -106,40 +188,44 @@ class Network():
             inputs = []
             outputs = []
             hiddens = []
-
             for i in range(self.inputs):
                 inputs.append(i)
-            for i in range((self.inputs), (self.size-self.outputs)):
+            for i in range(self.inputs, self.size-self.outputs):
                 hiddens.append(i)
             for i in range((self.size-self.outputs), self.size):
                 outputs.append(i)
 
-            #choice 1: connect input to hidden
-            #choice 2 connect hidden to output
-            #choice 3 connect hidden to hidden
+            #choice 1: connect input to hidden to output
+            #choice 2 connect hidden to hidden
 
-            choice = random.choice(range(2))
+            choice = random.choice(range(3))
 
             if choice == 0:
                 x = random.choice(inputs)  # choose in or out node
                 y = random.choice(hiddens)  # choose hidden node
+                z = random.choice(outputs)  # choose output node
+                self.genome[x][y] = random.random() * 2 - 1
+                self.genome[y][z] = random.random() * 2 - 1
+                if self.genome[y][z] > 1.0: self.genome[x][y] = 1.0
+                if self.genome[y][z] < -1.0: self.genome[x][y] = -1.0
             if choice == 1:
-                x = random.choice(hiddens)  # choose in or out node
-                y = random.choice(outputs)  # choose hidden node
-            #if choice == 2:
-           #     x = random.choice(hiddens)  # choose in or out node
-            #    y = random.choice(hiddens)  # choose hidden node
+                x = random.choice(hiddens)  # choose hidden
+                y = random.choice(hiddens)  # choose hidden
+                self.genome[x][y] = random.random() * 2 - 1
+            if choice == 2:
+                x = random.choice(inputs)  # choose input
+                y = random.choice(outputs)  # choose output
+                self.genome[x][y] = random.random() * 2 - 1
 
-            r = random.random() * 2 - 1
-            if self.binary:
-                if r > 0.0:
-                    r = 1.0
-                elif r <= 0.0:
-                    r = -1.0
+            #if self.binary:
+            #    if r > 0.0:
+            #        r = 1.0
+            #    elif r <= 0.0:
+            #        r = -1.0
 
-            self.genome[x][y] = r
-            if self.genome[x][y] > 1.0: self.genome[x][y] = 1.0
-            if self.genome[x][y] < -1.0: self.genome[x][y] = -1.0
+            #if self.genome[x][y] > 1.0: self.genome[x][y] = 1.0
+            #if self.genome[x][y] < -1.0: self.genome[x][y] = -1.0
+
             self.connections += 1
 
     def remove_gene(self, x):
@@ -158,7 +244,7 @@ class Network():
                 self.connections -= 1
 
     def mutate_gene(self, x):
-        for i in range(x):
+        for _ in range(x):
             x = random.choice(range(len(self.genome)))
             choice = []
             for i, c in enumerate(self.genome[x]):
@@ -180,12 +266,3 @@ class Network():
             if self.genome[x][y] > 1.0: self.genome[x][y] = 1.0
             if self.genome[x][y] < -1.0: self.genome[x][y] = -1.0
 
-    def add_output_connections(self):
-        #for i in range(self.inputs):
-        #    self.genome[i][i] = 0.0
-        #for i in range(self.outputs):
-        ##    for z in range(self.inputs, (self.size-self.outputs)):
-        #        self.genome[z][-(i+1)] = numpy.random.random()
-        #    for z in range(self.outputs):
-        #        self.genome[-(i+1)][(self.size-self.outputs)+z] = 0.0
-        pass
