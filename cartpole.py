@@ -3,7 +3,6 @@ from matrix import Utils
 from copy import copy
 import numpy
 import gym
-import rocket_lander_gym
 import random
 import pygame
 import math
@@ -24,7 +23,7 @@ screen = pygame.display.set_mode(size)
 pygame.display.flip()
 width, height = 10,10
 
-env = gym.make("RocketLander-v0")
+env = gym.make("cartpole-v0")
 
 win_state = 1000
 env._max_episode_steps = 1000
