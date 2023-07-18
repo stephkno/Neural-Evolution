@@ -10,7 +10,7 @@ class Utils():
     def mutation_curve(self,x):
         return x
 
-    def breed(self, agent1, agent2, inputs, outputs, binary, hidden, n):
+    def combine(self, agent1, agent2, inputs, outputs, binary, hidden, n):
 
         if agent2.genome.shape[0] > agent1.genome.shape[0]:
             g_diff_size = agent2.genome.shape[0]-agent1.genome.shape[0]
@@ -45,7 +45,7 @@ class Utils():
         i = 0
         while len(new_agents) < n_agents:
 
-            baby = self.breed(best, agents[-2], inputs, outputs, bin, hidden, i/n_agents-1)
+            baby = self.combine(best, agents[-2], inputs, outputs, bin, hidden, i/n_agents-1)
             #baby = copy.copy(agents[-1])
             baby.fitness = 0
 
@@ -81,7 +81,7 @@ class Network():
         self.inputs = inputs
         self.outputs = outputs
         self.lines_cleared = 0
-        self.render = False
+        self.render = True
         mat_size = inputs+outputs
         self.size = mat_size
         self.genome = numpy.zeros((mat_size, mat_size))

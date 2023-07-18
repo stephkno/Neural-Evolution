@@ -23,26 +23,25 @@ screen = pygame.display.set_mode(size)
 pygame.display.flip()
 width, height = 10,10
 
-env = gym.make("cartpole-v0")
+env = gym.make("CartPole-v1")
 
 win_state = 1000
 env._max_episode_steps = 1000
+
 
 if len(sys.argv) > 1:
     filename = sys.argv[1]
     best_agent = util.import_genome(filename)
     train = False
-
 else:
     print("New Agent")
 
 p_states = 1
 inputs = 10
-outputs = 4
+outputs = 2
 
 state = env.reset()
-print(state.shape)
-state = preprocess(state)
+state = preprocess(state[0])
 state = numpy.array([state for _ in range(p_states)])
 
 n_agents = 10
@@ -172,6 +171,7 @@ def render_network(agent, done, newbest, steps):
 
 #get first generation of agents
 agents = [get_new_agent(inputs, outputs) for _ in range(n_init_agents)]
+
 c = 0
 for a in agents:
     a.id += c
@@ -215,10 +215,11 @@ while train:# max_score < 2000:
                             break
 
                 x = agent.eval(state)
-                #action = int(numpy.argmax(x))
-                action = numpy.random.choice(range(outputs), p=x)
 
-                new_state, reward, done, x = env.step(action)
+                #action = int(numpy.argmax(x))
+                action = numpy.random.choice(range(outputs), p=x/x.sum())
+
+                new_state, reward, done, _, x = env.step(int(action))
                 new_state = preprocess(new_state)
                 steps += 1
                 score += reward
@@ -238,7 +239,7 @@ while train:# max_score < 2000:
 
             done = False
             state = env.reset()
-            state = preprocess(state)
+            state = preprocess(state[0])
             state = numpy.array([state for _ in range(p_states)])
 
         agent.set_score(score)
@@ -259,7 +260,7 @@ while train:# max_score < 2000:
 
     #generation is finished
     state = env.reset()
-    state = preprocess(state)
+    state = preprocess(state[0])
 
     state = numpy.array([state for _ in range(p_states)])
     agents = sorted(agents, key=get_key, reverse=False)
