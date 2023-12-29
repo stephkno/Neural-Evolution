@@ -24,7 +24,7 @@ size = (300, 300)
 #pygame.display.flip()
 width, height = 10,10
 
-env_name = "MountainCar-v0"
+env_name = "Cartpole-v1"
 env = gym.make(env_name)
 win_state = 100
 env._max_episode_steps = 500
