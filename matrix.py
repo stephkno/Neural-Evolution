@@ -2,12 +2,13 @@ import numpy
 import random
 import pickle
 import copy
+import json
 
 class Utils():
     def __init__(self):
         super(Utils, self).__init__()
-        self.prob_mutate = 0.5
-        self.prob_add_gene = 0.5
+        self.prob_mutate = 0.8
+        self.prob_add_gene = 0.01
 
     def mutation_curve(self,x):
         return x
@@ -55,7 +56,7 @@ class Utils():
             if numpy.random.random() > self.prob_mutate:
 
                 if numpy.random.random() > self.prob_add_gene:
-                    new_agent.add_nodes(1)
+                    new_agent.add_gene(self.mutation_curve(i))
                 else:
                     new_agent.remove_gene(1)
             else:
@@ -180,6 +181,7 @@ class Network():
             inputs = []
             outputs = []
             hiddens = []
+            
             for i in range(self.inputs):
                 inputs.append(i)
             for i in range(self.inputs, self.size-self.outputs):
@@ -246,6 +248,7 @@ class Network():
                     choice.append(i)
 
             if len(choice) == 0: break
+            
             y = random.choice(choice)
             r = (random.random() * 2 - 1)
 

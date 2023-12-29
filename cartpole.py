@@ -24,9 +24,10 @@ size = (300, 300)
 #pygame.display.flip()
 width, height = 10,10
 
-env = gym.make("CartPole-v1")
-win_state = 2000
-env._max_episode_steps = 2000
+env_name = "MountainCar-v0"
+env = gym.make(env_name)
+win_state = 100
+env._max_episode_steps = 500
 
 if len(sys.argv) > 1:
     filename = sys.argv[1]
@@ -35,8 +36,8 @@ if len(sys.argv) > 1:
 else:
     print("New Agent")
 
-p_states = 3
-inputs = 4*p_states
+p_states = 1
+inputs = 16*p_states
 outputs = 2
 
 state = env.reset()
@@ -64,7 +65,7 @@ radius = 10
 species_count = 0
 lc = 0
 
-binary = True
+binary = False
 
 circle_radius = size[0]/2.5
 circle_offset = size[0]/2
@@ -189,7 +190,7 @@ def render_env(state):
 
 
 def run_episode(agent):
-    env = gym.make("CartPole-v1", render_mode="human")
+    env = gym.make(env_name, render_mode="human")
     env._max_episode_steps = 999999
 
     done = False
@@ -231,7 +232,8 @@ def run_episode(agent):
 
 def train_episode(agents, species_count, num_species, max_score, generation):
 
-    env = gym.make("CartPole-v1")
+    env = gym.make(env_name)
+    env._max_episode_steps = 3000
 
     done = False
     state = env.reset()
@@ -277,9 +279,9 @@ def train_episode(agents, species_count, num_species, max_score, generation):
                 state = numpy.roll(state, -1, axis=0)
                 state[-1] = new_state
 
-                if steps > win_state:
+                if score >= env._max_episode_steps:
+                    print("Agent{} exceeded environment max score! Steps:{} Score:{}".format(agent.id, steps, score))
                     done = True
-                    return 
 
                 #if render and steps % 2 == 0:
                    # env.render()
@@ -336,6 +338,9 @@ while train:
             max_score = agent.fitness
             best_agent = copy(agent)
             best_agent_id = species_count
+
+            if max_score >= env._max_episode_steps:
+                train = False
 
 
 print("\nEvaluation...")
