@@ -6,6 +6,8 @@ import copy
 class Utils():
     def __init__(self):
         super(Utils, self).__init__()
+        self.prob_mutate = 0.5
+        self.prob_add_gene = 0.5
 
     def mutation_curve(self,x):
         return x
@@ -14,11 +16,11 @@ class Utils():
 
         if agent2.genome.shape[0] > agent1.genome.shape[0]:
             g_diff_size = agent2.genome.shape[0]-agent1.genome.shape[0]
-            agent1.add_node(g_diff_size)
+            agent1.add_nodes(g_diff_size)
 
         elif agent1.genome.shape[0] > agent2.genome.shape[0]:
             g_diff_size = agent1.genome.shape[0]-agent2.genome.shape[0]
-            agent2.add_node(g_diff_size)
+            agent2.add_nodes(g_diff_size)
 
         genome1 = agent1.genome
         genome2 = agent2.genome
@@ -39,28 +41,30 @@ class Utils():
         new_agent.genome = new_genome
         return new_agent
 
-    def speciate(self, agents, best, num_species, inputs, outputs, bin, hidden, n_agents):
+    def generate_agents(self, agents, best, num_species, inputs, outputs, bin, hidden, n_agents):
 
         new_agents = agents
         i = 0
         while len(new_agents) < n_agents:
 
-            baby = self.combine(best, agents[-2], inputs, outputs, bin, hidden, i/n_agents-1)
-            #baby = copy.copy(agents[-1])
-            baby.fitness = 0
+            new_agent = self.combine(best, agents[-2], inputs, outputs, bin, hidden, i/n_agents-1)
+            #new_agent = copy.copy(agents[-1])
+            new_agent.fitness = 0
 
-            if numpy.random.random() > 0.8:
-                if numpy.random.random() > 0.5:
-                    baby.add_gene(self.mutation_curve(i))
+            
+            if numpy.random.random() > self.prob_mutate:
+
+                if numpy.random.random() > self.prob_add_gene:
+                    new_agent.add_nodes(1)
                 else:
-                    baby.add_node(1)
+                    new_agent.remove_gene(1)
             else:
-                baby.mutate_gene(self.mutation_curve(i))
+                new_agent.mutate_gene(self.mutation_curve(i))
             i+=1
             num_species+=1
 
-            baby.id = num_species
-            new_agents.append(baby)
+            new_agent.id = num_species
+            new_agents.append(new_agent)
 
         return new_agents, num_species
 
@@ -81,7 +85,7 @@ class Network():
         self.inputs = inputs
         self.outputs = outputs
         self.lines_cleared = 0
-        self.render = True
+        self.render = False
         mat_size = inputs+outputs
         self.size = mat_size
         self.genome = numpy.zeros((mat_size, mat_size))
@@ -95,7 +99,7 @@ class Network():
         self.recurrent_decay = 0.0
         self.id = id
 
-    def set_score(self, score):
+    def set_fitness(self, score):
         if self.fitness == 0:
             self.fitness = score
         else:
@@ -109,23 +113,11 @@ class Network():
 
     def softmax(self, x):
         return numpy.exp(x) / sum(numpy.exp(x))
+    
     def sigmoid(self, x):
         return 1 / (1 + numpy.exp(-x))
 
-    def get_weight(self):
-        if self.binary:
-            #return binary weight
-            return random.choice([-1,1])
-        else:
-            #return continuous weight
-            return random.random()*2-1
-
-    #def prune(self):
-    #    for i,x in enumerate(self.genome):
-    #        if i >= self.inputs and i < self.size-self.outputs:
-    #            if
-
-    def eval(self, x):
+    def evaluate(self, x):
 
         #clear node vectors
         self.nodes = self.nodes * self.neuron_decay
@@ -172,7 +164,7 @@ class Network():
         out = self.nodes[-self.outputs:]
         return self.sigmoid(out)
 
-    def add_node(self, x):
+    def add_nodes(self, x):
         for _ in range(x):
             #insert new node into vectors
             self.nodes = numpy.insert(self.nodes, self.inputs, 0.0, axis=0)
@@ -245,6 +237,8 @@ class Network():
 
     def mutate_gene(self, x):
         for _ in range(x):
+            
+            #choose which genes to mutate
             x = random.choice(range(len(self.genome)))
             choice = []
             for i, c in enumerate(self.genome[x]):
@@ -253,7 +247,6 @@ class Network():
 
             if len(choice) == 0: break
             y = random.choice(choice)
-
             r = (random.random() * 2 - 1)
 
             if self.binary:

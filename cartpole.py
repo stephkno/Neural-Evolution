@@ -4,12 +4,13 @@ from copy import copy
 import numpy
 import gym
 import random
-import pygame
+#import pygame
 import math
 import sys
 import skimage.measure
 import cv2
 import atexit
+from threading import Thread
 
 def preprocess(x):
     return numpy.array(x).reshape(-1,1)/10
@@ -17,17 +18,15 @@ def preprocess(x):
 util = Utils()
 train = True
 
-pygame.init()
+#pygame.init()
 size = (300, 300)
-screen = pygame.display.set_mode(size)
-pygame.display.flip()
+#screen = pygame.display.set_mode(size)
+#pygame.display.flip()
 width, height = 10,10
 
 env = gym.make("CartPole-v1")
-
-win_state = 1000
-env._max_episode_steps = 1000
-
+win_state = 2000
+env._max_episode_steps = 2000
 
 if len(sys.argv) > 1:
     filename = sys.argv[1]
@@ -36,18 +35,19 @@ if len(sys.argv) > 1:
 else:
     print("New Agent")
 
-p_states = 1
-inputs = 10
+p_states = 3
+inputs = 4*p_states
 outputs = 2
 
 state = env.reset()
+print(state)
 state = preprocess(state[0])
 state = numpy.array([state for _ in range(p_states)])
 
-n_agents = 10
-n_init_agents = 10
+n_agents = 25
+n_init_agents = 25
 num_species = 0
-num_tries = 2
+num_tries = 1
 
 agents = []
 species = []
@@ -64,12 +64,12 @@ radius = 10
 species_count = 0
 lc = 0
 
-binary = False
+binary = True
 
 circle_radius = size[0]/2.5
 circle_offset = size[0]/2
 
-pygame.display.set_caption("")
+#pygame.display.set_caption("")
 
 #add gene, remove gene, mutate gene, add node
 mutation_probs = numpy.array([10,15,25,0])
@@ -78,12 +78,10 @@ invert = False
 
 def get_new_agent(inputs, outputs):
     agent = Network(inputs, outputs, binary, species_count)
-    agent.add_node(initial_hidden_node_size)
+    agent.add_nodes(initial_hidden_node_size)
     agent.add_gene(initial_genome_size)
     return agent
 
-best_agent = get_new_agent(inputs, outputs)
-best_agent_id = 0
 
 def mutation_curve(x):
     #x = int(numpy.power(2,(x/10))/10)+1 #exponential
@@ -182,13 +180,63 @@ def get_key(element):
     return element.fitness
 
 def render_env(state):
-    state = numpy.transpose(state, (1, 0))
-    state = cv2.resize(state, (10*width, 10*height), interpolation=cv2.INTER_AREA)
 
+    #state = numpy.transpose(state, (1, 0))
+    state = cv2.resize(state, (10*width, 10*height), interpolation=cv2.INTER_AREA)
+ 
     cv2.imshow("state", state)
     cv2.waitKey(1)
 
-while train:# max_score < 2000:
+
+def run_episode(agent):
+    env = gym.make("CartPole-v1", render_mode="human")
+    env._max_episode_steps = 999999
+
+    done = False
+    new_state, _ = env.reset()
+    
+    state = env.reset()
+    state = preprocess(state[0])
+    state = numpy.array([state for _ in range(p_states)])
+
+    steps = 0
+    score = 0
+
+    while not done:
+#        for event in pygame.event.get():  # User did something
+#            if event.type == pygame.QUIT:  # If user clicked close
+#                break
+
+        x = agent.evaluate(state)
+        env.render()
+
+        action = int(numpy.argmax(x))
+        #action = numpy.random.choice(range(outputs), p=x/x.sum())
+        new_state, reward, done, _, x = env.step(int(action))
+
+        new_state = preprocess(new_state)
+        steps += 1
+        score += reward
+        env.render()
+
+        #if agent.render:
+            #render_network(agent, done, (steps > max_score), steps)
+            #render_env()
+
+        state = numpy.roll(state, -1, axis=0)
+        state[-1] = new_state
+
+    done = False
+
+
+def train_episode(agents, species_count, num_species, max_score, generation):
+
+    env = gym.make("CartPole-v1")
+
+    done = False
+    state = env.reset()
+    state = preprocess(state[0])
+    state = numpy.array([state for _ in range(p_states)])
 
     for i,agent in enumerate(agents):
         #agent.render = False
@@ -196,15 +244,13 @@ while train:# max_score < 2000:
         sys.stdout.flush()
         species_count += 1
         score = 0.0
-        lines_cleared = 0
 
-        best_of_gen = 0.0
 
         for _ in range(num_tries):
             steps = 0
             while not done:
 
-                for event in pygame.event.get():  # User did something
+                for event in []:#pygame.event.get():  # User did something
                     if event.type == pygame.QUIT:  # If user clicked close
                         break
                     if event.type == pygame.KEYDOWN:
@@ -214,46 +260,55 @@ while train:# max_score < 2000:
                             train = False
                             break
 
-                x = agent.eval(state)
+                x = agent.evaluate(state)
 
-                #action = int(numpy.argmax(x))
-                action = numpy.random.choice(range(outputs), p=x/x.sum())
-
+                action = int(numpy.argmax(x))
+                #action = numpy.random.choice(range(outputs), p=x/x.sum())
                 new_state, reward, done, _, x = env.step(int(action))
+
                 new_state = preprocess(new_state)
                 steps += 1
                 score += reward
 
-                if agent.render:
-                    render_network(agent, done, (steps > max_score), steps)
-                    env.render()
+                #if agent.render:
+                    #render_network(agent, done, (steps > max_score), steps)
+                #env.render()
 
                 state = numpy.roll(state, -1, axis=0)
                 state[-1] = new_state
 
+                if steps > win_state:
+                    done = True
+                    return 
+
                 #if render and steps % 2 == 0:
-                    #env.render()
+                   # env.render()
 
            # print("Steps:{}".format(steps))
 
-
             done = False
             state = env.reset()
+
             state = preprocess(state[0])
             state = numpy.array([state for _ in range(p_states)])
 
-        agent.set_score(score)
-
-        if score > max_score:
-            max_score = score
-            best_agent = copy(agent)
-            best_agent_id = species_count
+        agent.set_fitness(score)
 
         score = 0
 
         if generation % 10 == 0 and agent.fitness >= win_state:
             train = False
             break
+
+
+best_agent = get_new_agent(inputs, outputs)
+best_agent_id = 0
+
+#    thread = Thread(target = run_episode, args = (best_agent, ))
+#    thread.start()
+
+while train:
+    train_episode(agents, species_count, num_species, max_score, generation)
 
     #if generation > 25:
     #    run_episode(best_agent)
@@ -267,47 +322,25 @@ while train:# max_score < 2000:
 
     for i,a in enumerate(agents):
         print("|Agent {}|Fitness: {}|".format(a.id, a.fitness))
-    #for agent in agents:
+    
 
-
-    print("\n[Generation:#{}|Max Fitness:{}|Lines:{}|BestAgent:{}]".format(generation, max_score, lc, best_agent.id))
-    agents, num_species = util.speciate(agents[int(len(agents)/2):], best_agent, num_species, inputs, outputs, binary, initial_hidden_node_size, n_agents)
+    print("\n[Generation:#{}|Max Fitness:{}|Size:{}|BestAgent:{}]".format(generation, max_score, best_agent.genome.size, best_agent.id))
+    agents, num_species = util.generate_agents(agents[int(len(agents)/2):], best_agent, num_species, inputs, outputs, binary, initial_hidden_node_size, n_agents)
     winner_agents = []
 
-    generation += 1
     sys.stdout.flush()
+    generation += 1
+
+    for agent in agents:
+        if agent.fitness > max_score:
+            max_score = agent.fitness
+            best_agent = copy(agent)
+            best_agent_id = species_count
+
 
 print("\nEvaluation...")
-#endless loop - for victory!
 render = True
+agent.render = True
 
 while True:
-
-    steps = 0
-    score = 0
-    while not done:
-        for event in pygame.event.get():  # User did something
-            if event.type == pygame.QUIT:  # If user clicked close
-                break
-
-        x = best_agent.eval(state)
-        action = int(numpy.argmax(x))
-        #action = numpy.random.choice(range(outputs), p=x)
-
-        new_state, reward, done, x = env.step(action)
-        new_state = preprocess(new_state)
-
-        render_network(best_agent, done, (steps > max_score), steps)
-
-        steps += 1
-        score += reward
-
-        state = numpy.roll(state, -1, axis=0)
-        state[-1] = new_state
-
-
-
-    done = False
-    state = env.reset()
-    state = preprocess(state)
-    state = numpy.array([state for _ in range(p_states)])
+    run_episode(best_agent)
